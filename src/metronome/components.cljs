@@ -8,9 +8,9 @@
       :eight "\u266B"
       :sixteen "\u266C")))
 
-(defn single-note [type note click]
+(defn single-note [type note is-selected click]
   (let [styles {:width "60px"
-                :color (if (:is-selected note)
+                :color (if (= is-selected true)
                           "#2196F3"
                           "#424242")
                 :cursor "pointer"
@@ -20,13 +20,14 @@
                 :textAlign "center"
                 :height "60px"}]
     [:div {:on-click #(click type)
+           :key type
            :style styles}
           (get-note-icon type)]))
 
 
-(defn notes-list [notes on-select]
+(defn notes-list [notes selected-note on-select]
   [:div {:style
          {:display "flex"}}
    (map
-     #(single-note (first %) (second %) on-select)
+     #(single-note (first %) (second %) (= selected-note (first %)) on-select)
      notes)])

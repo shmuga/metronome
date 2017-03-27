@@ -8,9 +8,18 @@
 
 (defonce context (bach/audio-context))
 
+
+(def all-notes
+  (r/atom {:four {:time 0.25}
+           :eight {:time 0.125}
+           :sixteen {:time 0.0625}}))
+
+(def selected-note (r/atom :four))
+
+
 (def tempo (r/atom 60))
 (def accents [1 0 0 0])
-(def notes (r/atom (/ 1 16)))
+(def play-note (r/atom (:time (@selected-note @all-notes))))
 
 (defn calculate-fours-per-second [tempo]
   (/ 60 tempo))
@@ -21,14 +30,16 @@
 
 (def fours-per-second (r/atom (calculate-fours-per-second @tempo)))
 
-(def per-second (r/atom (calculate-per-second @notes @fours-per-second)))
+(def per-second (r/atom (calculate-per-second @play-note @fours-per-second)))
 
+
+(add-watch selected-note :selected-note #(reset! play-note (:time (@selected-note @all-notes))))
 
 (add-watch tempo :tempo #(reset! fours-per-second (calculate-fours-per-second %4)))
 
-(add-watch notes :notes #(reset! per-second (calculate-per-second %4 @fours-per-second)))
+(add-watch play-note :notes #(reset! per-second (calculate-per-second %4 @fours-per-second)))
 
-(add-watch fours-per-second :fours #(reset! per-second (calculate-per-second @notes %4)))
+(add-watch fours-per-second :fours #(reset! per-second (calculate-per-second @play-note %4)))
 
 
 (def is-working (atom false))
@@ -70,27 +81,16 @@
 (defn stop-interval []
   (reset! is-working false))
 
-(def all-notes
-  (r/atom {:four {:time 0.25 :is-selected true}
-           :eight {:time 0.125 :is-selected false}
-           :sixteen {:time 0.0625 :is-selected false}}))
-
-
 
 (defn on-note-select [selected-key]
-  (map
-    #(swap! all-notes
-              update-in
-                [(first %)]
-                assoc :is-selected (= selected-key (first %)))
-    @all-notes))
+  (reset! selected-note selected-key))
 
 
 
 (defn child [name]
   [:div "Hi, I am " name
    [:br]
-   [c/notes-list @all-notes on-note-select]
+   [c/notes-list @all-notes @selected-note on-note-select]
    [:button
     {:on-click start-interval}
     "Start!"]
@@ -101,12 +101,7 @@
    [:input {
             :type "number"
             :value @tempo
-            :on-change #(reset! tempo (-> % .-target .-value))}]
-   [:br]
-   [:input {
-            :type "text"
-            :value @notes
-            :on-change #(reset! notes (-> % .-target .-value))}]])
+            :on-change #(reset! tempo (-> % .-target .-value))}]])
 
 
 
