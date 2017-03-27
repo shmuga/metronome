@@ -1,22 +1,16 @@
 (ns metronome.core
     (:require [reagent.core :as r]
+              [metronome.components :as c]
               [cljs-bach.synthesis :as bach]
               [keybind.core :as key]))
 
 (enable-console-print!)
 
-(println "This text is printed from src/metronome/core.cljs. Go ahead and edit it and see reloading in action.")
-
-;; define your app data so that it doesn't get over-written on reload
-
-(defonce app-state (atom {:interval "Hello world!"}))
-
 (defonce context (bach/audio-context))
 
 (def tempo (r/atom 60))
-(def accents [0 0 0 0])
+(def accents [1 0 0 0])
 (def notes (r/atom (/ 1 16)))
-
 
 (defn calculate-fours-per-second [tempo]
   (/ 60 tempo))
@@ -39,46 +33,32 @@
 
 (def is-working (atom false))
 
-(defn on-js-reload [])
-  ;; optionally touch your app-state to force rerendering depending on
-  ;; your application
-  ;; (swap! app-state update-in [:__figwheel_counter] inc)
 
-(defn ping [freq]
+(defn sound-seq [freq]
   (bach/connect->
     (bach/add
       (bach/sine (+ freq 2))
       (bach/sine freq))         ; Try a sawtooth wave.
     (bach/percussive 0.01 0.04))) ; Try varying the attack and decay.
 
-
-(defn sound
+(defn make-sound
   "docstring"
   [freq]
-  (-> (ping freq)
+  (-> (sound-seq freq)
       (bach/connect-> bach/destination)
       (bach/run-with context (bach/current-time context) 1)))
 
+(def accent-counter (atom -1))
 
-(key/bind! "k" ::k #(sound 2093))
-(key/bind! "a" ::a #(sound 1760))
-(key/bind! "l" ::l #(sound 540))
-(key/bind! "i" ::i #(sound 240))
-(key/bind! "n" ::n #(sound 110.000))
-(key/bind! "k" ::k #(sound 2240))
-(key/bind! "m" ::m #(sound 4440))
-
-(def counter (atom -1))
-
-(defn play-sound []
-  (reset! counter (mod (+ @counter 1) (count accents)))
-  (if (= (accents @counter) 0)
-    (sound 1760)
-    (sound 2093)))
+(defn play-metronom-sound []
+  (reset! accent-counter (mod (+ @accent-counter 1) (count accents)))
+  (if (= (accents @accent-counter) 0)
+    (make-sound 1760)
+    (make-sound 2093)))
 
 
 (defn play-infinite-sound []
-  (play-sound)
+  (play-metronom-sound)
   (if @is-working
     (js/setTimeout play-infinite-sound (/ 1000 @per-second))
     ()))
@@ -90,10 +70,27 @@
 (defn stop-interval []
   (reset! is-working false))
 
+(def all-notes
+  (r/atom {:four {:time 0.25 :is-selected true}
+           :eight {:time 0.125 :is-selected false}
+           :sixteen {:time 0.0625 :is-selected false}}))
+
+
+
+(defn on-note-select [selected-key]
+  (map
+    #(swap! all-notes
+              update-in
+                [(first %)]
+                assoc :is-selected (= selected-key (first %)))
+    @all-notes))
+
+
 
 (defn child [name]
-  [:p "Hi, I am " name
+  [:div "Hi, I am " name
    [:br]
+   [c/notes-list @all-notes on-note-select]
    [:button
     {:on-click start-interval}
     "Start!"]
